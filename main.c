@@ -1,14 +1,3 @@
-/*
-CENTRO DE ENGENHARIA, MODELAGEM E CIÊNCIAS SOCIAIS
-APLICADAS
-PROJETO 3:
-JOGO NO DISPLAY LCD
-Discentes:
-Lucas Hissao Kuriki Portezan RA: 11027613
-Mateus Toyama Alvim RA: 11049413
-Renan Melo de Freitas RA: 21025014
-Thiago Henrique Stella RA: 21009414
-*/
 #include <8051.h>
 #include <stdlib.h> //Para utilizar a função rand()
 
