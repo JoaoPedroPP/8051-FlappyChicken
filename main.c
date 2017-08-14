@@ -117,7 +117,7 @@ void drawObj(unsigned char index,unsigned char y, unsigned char obj, unsigned ch
 	sendChar(' '); //Envia o caractere espaço
 	gotoPos(y, index); //Move o cursor para a nova posição do obstáculo
 	if(y == flag) {
-		sendChar(' ');
+		//sendChar(' ');
 	}
 	else{
 		sendChar(obj); //Envia o caractere customizado do obstáculo (cacto ou míssel)
@@ -152,8 +152,9 @@ void serial_interrupt() interrupt 4 //Rotina de interrupção da serial
 				}
 				break;*/
 			case 0x38: //Caso seja pressionado 8
-				if (y_pos >= 0) //Se o personagem não estiver pulando
+				if (y_pos > 0) //Se o personagem não estiver pulando
 				{	gotoPos(y_pos, x_pos);
+					t0ms = 0;
 					sendChar(' ');
 					drawChar(y_pos--, x_pos); //O personagem pula
 				}
@@ -218,8 +219,8 @@ void main()
 			if (t0ms > 100 && y_pos < 3){
 				t0ms = 0;
 				gotoPos(y_pos, x_pos);
-				sendChar(' ');
-				drawChar(y_pos++, x_pos); //Faz o personagem cair
+				//sendChar(' ');
+				//drawChar(y_pos++, x_pos); //Faz o personagem cair
 			}
 			if (cactos[2] == 1) //Se existe um cacto no início da tela
 			{
@@ -256,6 +257,8 @@ void main()
 					drawObj(i,1, 0x01, rand_pipe[i-1]);
 					drawObj(i,2, 0x01, rand_pipe[i-1]);
 					drawObj(i,3, 0x01, rand_pipe[i-1]);
+					gotoPos(y_pos, x_pos);
+					sendChar(0x00);
 				}
 				cactos[i] = cactos[i + 1]; //Move o cacto uma posição para esquerda
 				rand_pipe[i-1] = rand_pipe[i];
@@ -297,7 +300,8 @@ void main()
 					spawn = 0; //Reinicia o valor de spawn
 				}
 			}
-			if (cactos[x_pos] == 1 && jump == 0 || missels[x_pos] == 1 && jump > 0) //Testa colisão com os obstáculos
+//			if (cactos[x_pos] == 1 && jump == 0 || missels[x_pos] == 1 && jump > 0) //Testa colisão com os obstáculos
+			if (y_pos != rand_pipe[1] && cactos[x_pos])
 			{
 				lost = 1; //Se houve colisão perdeu
 			}
@@ -319,6 +323,7 @@ void main()
 			missels[i] = 0;
 		}
 		x_pos = 3; //Reinicia a posição do personagem
+		y_pos = 1;
 		jump = 0; //Reinicia o valor de jump
 		points = 0; //Reinicia a pontuação
 	}
