@@ -27,9 +27,14 @@ unsigned char missels[16]; //Armazena a posição dos mísseis
 unsigned char spawn; //Cria um espaço minimo entre os obstáculos
 unsigned char points; //Armazena os pontos do jogador
 unsigned char lost; //lost = 0 não perdeu, lost > 0 perdeu
-unsigned int t0ms = 0;
+unsigned int timerupdate = 0;
+unsigned int timerqueda = 0;
 unsigned int fall_interval = 1000;
 unsigned int fall_bird = 1000;
+
+unsigned int tqueda = 200;
+unsigned int nivel = 0;
+unsigned int tupdate = 600;
 
 void delay(unsigned int interval) //Rotina de atraso
 {
@@ -92,7 +97,8 @@ void clearScreen() //Rotina para limpar a tela do display LCD
 
 void timer_interrupt() interrupt 1 //Rotina de interrupção do TIMER0
 {
-	t0ms++;
+	timerupdate++;
+	timerqueda++;
 	TH0 = 0xFC;
 	TL0 = 0x66;
 }
@@ -126,11 +132,11 @@ void drawObj(unsigned char index,unsigned char y, unsigned char obj, unsigned ch
 
 void drawPoints() //Rotina para escrever a pontuação e o nível atual
 {
-	gotoPos(0, 8); //Move o cursor para a linha 0 coluna 8
+	gotoPos(0, 0); //Move o cursor para a linha 0 coluna 8
 	sendChar(points / 10 + 0x30); //Escreve a dezena da pontuação
 	sendChar(points % 10 + 0x30); //Escreve a unidade da pontuação
-	gotoPos(1, 7); //Move o cursor para a linha 1 coluna 7
-	sendChar(points / 5 + 0x30); //Envia o valor do nível
+	gotoPos(2, 0); //Move o cursor para a linha 1 coluna 7
+	sendChar(nivel + 0x30); //Envia o valor do nível
 }
 
 void serial_interrupt() interrupt 4 //Rotina de interrupção da serial
@@ -153,8 +159,8 @@ void serial_interrupt() interrupt 4 //Rotina de interrupção da serial
 				break;*/
 			case 0x38: //Caso seja pressionado 8
 				if (y_pos > 0) //Se o personagem não estiver pulando
-				{	gotoPos(y_pos, x_pos);
-					t0ms = 0;
+				{	timerqueda = 0;
+					gotoPos(y_pos, x_pos);
 					sendChar(' ');
 					drawChar(y_pos--, x_pos); //O personagem pula
 				}
@@ -172,7 +178,7 @@ void main()
 {
 	unsigned char i; //Variável para os loops
 	unsigned int r; //Variável para armazenar o valor aleatório gerado
-	IE = 0x92; //Ativa as interrupções da serial e do TIMER0 (EA = 1, ES = 1 e ET0 = 1)
+	IE = 0x82; //Ativa as interrupções da serial e do TIMER0 (EA = 1, ES = 1 e ET0 = 1)
 	TMOD = 0x21; //Configura o TIMER0 no modo 1 e o TIMER1 no modo 2
 	TH0 = 0xFC; //Configura o TIMER0 para frequência de 2kHz (taxa de amostragem da música)
 	TL0 = 0x66; //Configura o TIMER0 para frequência de 2kHz (taxa de amostragem da música)
@@ -198,16 +204,43 @@ void main()
 	{
 		sendChar(missel[i]);
 	}
+	
+	clearScreen();
+	
+	//gotoPos(0, 0); //Move o cursor para linha 0 coluna 0
+	//sendString("Pontos: 00"); //Escreve a string de pontos
+	//gotoPos(1, 0); //Move o cursor para linha 1 coluna 0
+	//sendString("Nivel: 0"); //Escreve a string de nível
+	drawPoints();
+	gotoPos(1, 3); //Move o cursor para linha 3 coluna 0
+	sendChar(0x00); //Escreve o caractere do personagem
+	
 	while (1)
 	{
-		gotoPos(0, 0); //Move o cursor para linha 0 coluna 0
-		//sendString("Pontos: 00"); //Escreve a string de pontos
-		gotoPos(1, 0); //Move o cursor para linha 1 coluna 0
-		//sendString("Nivel: 0"); //Escreve a string de nível
-		gotoPos(1, 3); //Move o cursor para linha 3 coluna 0
-		sendChar(0x00); //Escreve o caractere do personagem
-		while (lost == 0) //Enquanto não perder
+		
+		if (RI) {
+			if(lost ==0 && SBUF == 0x38){
+				timerqueda = 0;
+				if(y_pos > 0) {
+					gotoPos(y_pos, x_pos);
+					sendChar(' ');
+					drawChar(y_pos--, x_pos); //O personagem pula
+				}
+			}
+			else if (lost == 2 && SBUF == ' ') //Se perdeu e recebeu a tecla espaço reinicia o jogo
+			{
+				lost = 3;
+				drawPoints();
+				gotoPos(1, 3); //Move o cursor para linha 3 coluna 0
+				sendChar(0x00); //Escreve o caractere do personagem
+			}
+			SBUF = 0;
+			RI = 0;
+		}
+		
+		if (lost == 0) //Enquanto não perder
 		{/*
+		
 			if (jump > 0) //Se o pulo for maior que 0
 			{
 				jump++; //Incrementa o valor de pulo
@@ -216,11 +249,13 @@ void main()
 			{
 				drawChar(0, x_pos); //Faz o personagem cair
 			}*/
-			if (t0ms > 100 && y_pos < 3){
-				t0ms = 0;
+		if (timerupdate >= tupdate) {
+		timerupdate = 0;
+			if (timerqueda > tqueda && y_pos < 3){
+				timerqueda = 0;
 				gotoPos(y_pos, x_pos);
-				//sendChar(' ');
-				//drawChar(y_pos++, x_pos); //Faz o personagem cair
+				sendChar(' ');
+				drawChar(y_pos++, x_pos); //Faz o personagem cair
 			}
 			if (cactos[2] == 1) //Se existe um cacto no início da tela
 			{
@@ -233,8 +268,9 @@ void main()
 				sendChar(' ');
 				gotoPos(0, 2);
 				sendChar(' ');
-				//points++; //Incrementa a pontuação
-				//drawPoints(); //Escreve a pontuação
+				points++; //Incrementa a pontuação
+				nivel = points / 5 > 5 ? 5 : points / 5; 
+				drawPoints(); //Escreve a pontuação
 			}
 			//rand_pipe[0] = 2;
 			for (i = 0; i < 15; i++) //Loop para mover os cactos
@@ -265,66 +301,50 @@ void main()
 				cactos[i + 1] = 0; //Remove o cacto da posição antiga
 //				rand_pipe[i + 1] = 0;
 			}
-			if (missels[0] == 1) //Se existe um míssel no início da tela
-			{
-				missels[0] = 0; //Remove o míssel
-				gotoPos(2, 0); //Move o cursor para linha 3 coluna 0
-				sendChar(' '); //Envia o caractere espaço
-				//points++; //Incrementa a pontuação
-				//drawPoints(); //Escreve a pontuação
-			}/*
-			for (i = 0; i < 15; i++) //Loop para mover os mísseis
-			{
-				if (missels[i] != missels[i + 1]) //Se não houver míssel em i e houver em i+1
-				{
-					drawObj(i, 0x02); //Desenha o míssel na posição nova
-				}
-				missels[i] = missels[i + 1]; //Move o míssel uma posição para esquerda
-				missels[i + 1] = 0; //Remove o míssel da posição antiga
-			}*/
-			if (spawn < 4) //Se spawn for menor que 4 incrementa o seu valor
+			if (spawn < 5) //Se spawn for menor que 4 incrementa o seu valor
 			{
 				spawn++;
 			}
-			if (spawn == 4) //Se spawn atingiu o valor 4
+			if (spawn == 5) //Se spawn atingiu o valor 4
 			{
-				r = rand(); //Gera um número pseudo-aleatório entre 0 e 32767
-				if (r > 27767) //Se o número for maior que 27767 (5000 possibilidades)
-				{
-					cactos[15] = 1; //Gera um cacto no final da tela
-					spawn = 0; //Reinicia o valor de spawn
-				}
-				else if (r > 22767) //Senão se o número for maior que 22767 (5000 possibilidades)
-				{
-					missels[15] = 1; //Gera um cacto no final da tela
-					spawn = 0; //Reinicia o valor de spawn
-				}
+				cactos[15] = 1; //Gera um cacto no final da tela
+				spawn = 0; //Reinicia o valor de spawn	
 			}
 //			if (cactos[x_pos] == 1 && jump == 0 || missels[x_pos] == 1 && jump > 0) //Testa colisão com os obstáculos
 			if (y_pos != rand_pipe[1] && cactos[x_pos])
 			{
 				lost = 1; //Se houve colisão perdeu
 			}
-			delay(500 - (points / 5 * 50)); //Atraso que se torna menor conforme avança de nível
+			
+			tupdate = 600 - nivel * 50;
+			tqueda = tupdate / 3;
+			//delay(tupdate); //Atraso que se torna menor conforme avança de nível
 		}
-		lost = 2; //Indica que está na tela de fim de jogo
-		clearScreen(); //Limpa a tela do display LCD
-		gotoPos(1, 0); //Move o cursor para a linha 1 coluna 0
-		sendString("_|_ FUCK YOU _|_"); //Escreve a string de fim de jogo
-		gotoPos(2, 0); //Move o cursor para a linha 2 coluna 0
-		//sendChar(points / 10 + 0x30); //Escreve a dezena da pontuação
-		//sendChar(points % 10 + 0x30); //Escreve a unidade da pontuação
-		//sendString(" pontos"); //Escreve a string de pontos
-		while (lost == 2); //Trava o programa enquanto lost for igual a 2
-		clearScreen(); //Limpa a tela
-		for (i = 0; i < 16; i++) //Reinicia os vetores dos obstáculos
+		} 
+		else if (lost ==  1) {
+			lost = 2; //Indica que está na tela de fim de jogo
+			clearScreen(); //Limpa a tela do display LCD
+			
+			gotoPos(1, 0); //Move o cursor para a linha 1 coluna 0
+			sendString("_|_ FUCK YOU _|_"); //Escreve a string de fim de jogo
+			gotoPos(2, 5); //Move o cursor para a linha 2 coluna 0
+			sendChar(points / 10 + 0x30); //Escreve a dezena da pontuação
+			sendChar(points % 10 + 0x30); //Escreve a unidade da pontuação
+			sendString(" pts"); //Escreve a string de pontos
+		}
+		else if (lost == 3)  //Trava o programa enquanto lost for igual a 2
 		{
-			cactos[i] = 0;
-			missels[i] = 0;
+			lost = 0;
+			clearScreen(); //Limpa a tela
+			for (i = 0; i < 16; i++) //Reinicia os vetores dos obstáculos
+			{
+				cactos[i] = 0;
+				missels[i] = 0;
+			}
+			x_pos = 3; //Reinicia a posição do personagem
+			y_pos = 1;
+			jump = 0; //Reinicia o valor de jump
+			points = 0; //Reinicia a pontuação
 		}
-		x_pos = 3; //Reinicia a posição do personagem
-		y_pos = 1;
-		jump = 0; //Reinicia o valor de jump
-		points = 0; //Reinicia a pontuação
 	}
 }
